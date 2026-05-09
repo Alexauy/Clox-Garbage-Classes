@@ -96,6 +96,27 @@ static bool setFieldNative(int argCount, Value* args, Value* result){
   return true;
 }
 
+static bool deleteFieldNative(int argCount, Value* args, Value* result){
+  if(argCount != 2){
+    *result = NIL_VAL;
+    return true;
+  }
+
+  if(!IS_INSTANCE(args[0]) || !IS_STRING(args[1])){
+    *result = NIL_VAL;
+    return true;
+  }
+
+  ObjInstance* instance = AS_INSTANCE(args[0]);
+  ObjString* name = AS_STRING(args[1]);
+
+  tableDelete(&instance->fields, name);
+
+  *result = NIL_VAL;
+  return true;
+
+}
+
 static void resetStack() {
   vm.stackTop = vm.stack;
   vm.frameCount = 0;
@@ -148,6 +169,7 @@ void initVM() {
   defineNative("len", 1, lenNative);
   defineNative("getField", 2, getFieldNative);
   defineNative("setField", 3, setFieldNative);
+  defineNative("deleteField", 2, deleteFieldNative);
 }
 
 void freeVM() {

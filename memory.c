@@ -1,5 +1,6 @@
 #include <stdlib.h>
 
+#include "compiler.h"
 #include "memory.h"
 #include "vm.h"
 
@@ -62,10 +63,16 @@ static void markRoots(){
 
   markTable(&vm.globals);
   markTable(&vm.strings);
+  markCompilerRoots();
 }
 //blackenObject()
 static void blackenObject(Obj* object){
   switch (object->type) {
+    case OBJ_CLASS: {
+      ObjClass* klass = (ObjClass*)object;
+      markObject((Obj*)klass->name);
+      break;
+    }
     case OBJ_FUNCTION: {
     ObjFunction* function = (ObjFunction*)object;
 
@@ -89,6 +96,12 @@ static void blackenObject(Obj* object){
     break;
     }
 
+    case OBJ_INSTANCE: {
+      ObjInstance* instance = (ObjInstance*)object;
+      markObject((Obj*)instance->klass);
+      break;
+    }
+
     case OBJ_UPVALUE:
     markValue(((ObjUpvalue*)object)->closed);
     break;
@@ -107,6 +120,9 @@ static void traceReferences() {
 
 void freeObject(Obj* object) {
   switch (object->type) {
+    case OBJ_CLASS:
+      FREE(ObjClass, object);
+      break;
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
       FREE_ARRAY(ObjUpvalue*, closure->upvalues,
@@ -120,6 +136,9 @@ void freeObject(Obj* object) {
       FREE(ObjFunction, object);
       break;
     }
+    case OBJ_INSTANCE:
+      FREE(ObjInstance, object);
+      break;
     case OBJ_NATIVE:
       FREE(ObjNative, object);
       break;

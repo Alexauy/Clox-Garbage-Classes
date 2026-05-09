@@ -99,18 +99,8 @@ bool tableSet(Table* table, ObjString* key, Value value) {
   bool isNewKey = entry->key == NULL;
   if (isNewKey && IS_NIL(entry->value)) table->count++;
 
-  if(entry->key != NULL){
-    if(IS_OBJ(entry->value)){
-      releaseObject(AS_OBJ(entry->value));
-    }
-  }
-
   entry->key = key;
   entry->value = value;
-
-  if (IS_OBJ(value)) {
-  retainObject(AS_OBJ(value));
-  }
 
   return isNewKey;
 }
@@ -120,10 +110,6 @@ bool tableDelete(Table* table, ObjString* key) {
   // Find the entry.
   Entry* entry = findEntry(table->entries, table->capacity, key);
   if (entry->key == NULL) return false;
-
-  if (IS_OBJ(entry->value)) {
-  releaseObject(AS_OBJ(entry->value));
-  }
 
   // Place a tombstone in the entry.
   entry->key = NULL;

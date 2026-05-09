@@ -98,22 +98,11 @@ void freeVM() {
 }
 void push(Value value) {
   *vm.stackTop = value;
-  if(IS_OBJ(value)){
-    retainObject(AS_OBJ(value));
-  }
-
   vm.stackTop++;
 }
 Value pop() {
   vm.stackTop--;
-
-  Value value = *vm.stackTop;
-
-  if(IS_OBJ(value)){
-    releaseObject(AS_OBJ(value));
-  }
-
-  return value;
+  return *vm.stackTop;
 }
 static Value peek(int distance) {
   return vm.stackTop[-1 - distance];
@@ -178,6 +167,15 @@ static bool callValue(Value callee, int argCount) {
     switch (OBJ_TYPE(callee)) {
       case OBJ_CLOSURE:
         return callClosure(AS_CLOSURE(callee), argCount);
+      case OBJ_CLASS: {
+        ObjClass* klass = AS_CLASS(callee);
+        if (argCount != 0) {
+          runtimeError("Expected 0 arguments but got %d.", argCount);
+          return false;
+        }
+        vm.stackTop[-argCount - 1] = OBJ_VAL(newInstance(klass));
+        return true;
+      }
       case OBJ_FUNCTION:
         return callFunction(AS_FUNCTION(callee), NULL, argCount);
       case OBJ_NATIVE: {
@@ -277,14 +275,12 @@ static InterpretResult run() {
       case OP_FALSE: push(BOOL_VAL(false)); break;
       case OP_POP: pop(); break;
       case OP_GET_LOCAL: {
-        //uint16_t slot = READ_SHORT();
-        uint16_t slot = READ_BYTE();
+        uint16_t slot = READ_SHORT();
         push(frame->slots[slot]); // [slot]
         break;
       }
       case OP_SET_LOCAL: {
-        //uint16_t slot = READ_SHORT();
-        uint16_t slot = READ_BYTE();
+        uint16_t slot = READ_SHORT();
         frame->slots[slot] = peek(0);
         break;
       }
@@ -393,6 +389,9 @@ static InterpretResult run() {
         ip = frame->ip;
         break;
       }
+      case OP_CLASS:
+        push(OBJ_VAL(newClass(READ_STRING())));
+        break;
       case OP_CLOSURE: {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
         /*ObjClosure* closure = NULL;

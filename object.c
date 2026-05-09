@@ -12,27 +12,21 @@ void freeObject(Obj* obj);
 #define ALLOCATE_OBJ(type, objectType) \
     (type*)allocateObject(sizeof(type), objectType)
 
-void retainObject(Obj* obj){
-  if(obj == NULL) return;
-  obj->refCount++;
-}
-
-void releaseObject(Obj* obj){
-  if(obj == NULL) return;
-  obj->refCount--;
-}
-
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, 0, size);
   object->type = type;
   object->isMarked = false;
-  object->refCount = 0;
 
   object->next = vm.objects;
   vm.objects = object;
   return object;
 }
 
+ObjClass* newClass(ObjString* name) {
+  ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
+  klass->name = name;
+  return klass;
+}
 ObjClosure* newClosure(ObjFunction* function) {
   ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, function->upvalueCount);
   for (int i = 0; i < function->upvalueCount; i++) {
@@ -53,6 +47,11 @@ ObjFunction* newFunction() {
   initChunk(&function->chunk);
   return function;
 }
+ObjInstance* newInstance(ObjClass* klass) {
+  ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
+  instance->klass = klass;
+  return instance;
+}
 ObjNative* newNative(int arity, NativeFn function) {
   ObjNative* native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
   native->arity = arity;
@@ -72,7 +71,9 @@ static ObjString* allocateString(char* chars, int length,
   string->length = length;
   string->chars = chars;
   string->hash = hash;
+  push(OBJ_VAL(string));
   tableSet(&vm.strings, string, NIL_VAL);
+  pop();
   return string;
 }
 static uint32_t hashString(const char* key, int length) {
@@ -114,11 +115,17 @@ static void printFunction(ObjFunction* function) {
 }
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
+    case OBJ_CLASS:
+      printf("%s", AS_CLASS(value)->name->chars);
+      break;
     case OBJ_CLOSURE:
       printFunction(AS_CLOSURE(value)->function);
       break;
     case OBJ_FUNCTION:
       printFunction(AS_FUNCTION(value));
+      break;
+    case OBJ_INSTANCE:
+      printf("%s instance", AS_INSTANCE(value)->klass->name->chars);
       break;
     case OBJ_NATIVE:
       printf("<native fn>");

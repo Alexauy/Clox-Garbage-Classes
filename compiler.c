@@ -342,6 +342,7 @@ static void defineVariable(uint8_t global) {
   emitBytes(OP_DEFINE_GLOBAL, global);
 }
 static void binary(bool canAssign) {
+  (void)canAssign;
   TokenType operatorType = parser.previous.type;
   ParseRule* rule = getRule(operatorType);
   parsePrecedence((Precedence)(rule->precedence + 1));
@@ -375,10 +376,12 @@ static uint8_t argumentList() {
   return argCount;
 }
 static void call(bool canAssign) {
+  (void)canAssign;
   uint8_t argCount = argumentList();
   emitBytes(OP_CALL, argCount);
 }
 static void and_(bool canAssign) {
+  (void)canAssign;
   int endJump = emitJump(OP_JUMP_IF_FALSE);
 
   emitByte(OP_POP);
@@ -387,6 +390,7 @@ static void and_(bool canAssign) {
   patchJump(endJump);
 }
 static void literal(bool canAssign) {
+  (void)canAssign;
   switch (parser.previous.type) {
     case TOKEN_FALSE: emitByte(OP_FALSE); break;
     case TOKEN_NIL: emitByte(OP_NIL); break;
@@ -395,18 +399,22 @@ static void literal(bool canAssign) {
   }
 }
 static void grouping(bool canAssign) {
+  (void)canAssign;
   expression();
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
 }
 static void number(bool canAssign) {
+  (void)canAssign;
   double value = strtod(parser.previous.start, NULL);
   emitConstant(NUMBER_VAL(value));
 }
 static void string(bool canAssign) {
+  (void)canAssign;
   emitConstant(OBJ_VAL(copyString(parser.previous.start + 1,
                                   parser.previous.length - 2)));
 }
 static void or_(bool canAssign) {
+  (void)canAssign;
   int elseJump = emitJump(OP_JUMP_IF_FALSE);
   int endJump = emitJump(OP_JUMP);
 
@@ -440,10 +448,8 @@ static void namedVariable(Token name, bool canAssign) {
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     if (isLocal) {
-      /*emitByte(setOp);
+      emitByte(setOp);
       emitShort((uint16_t)arg);
-      */
-      emitBytes(setOp, (uint8_t)arg);
     } else if (isUpvalue) {
       emitBytes(setOp, (uint8_t)arg);
     } else {
@@ -451,10 +457,8 @@ static void namedVariable(Token name, bool canAssign) {
     }
   } else {
     if (isLocal) {
-      /*emitByte(getOp);
+      emitByte(getOp);
       emitShort((uint16_t)arg);
-      */
-      emitBytes(getOp, (uint8_t)arg);
     } else if (isUpvalue) {
       emitBytes(getOp, (uint8_t)arg);
     } else {
@@ -466,6 +470,7 @@ static void variable(bool canAssign) {
   namedVariable(parser.previous, canAssign);
 }
 static void unary(bool canAssign) {
+  (void)canAssign;
   TokenType operatorType = parser.previous.type;
 
   // Compile the operand.
@@ -589,6 +594,17 @@ static void function(FunctionType type) {
     emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
     emitShort(compiler.upvalues[i].index);
   }
+}
+static void classDeclaration() {
+  consume(TOKEN_IDENTIFIER, "Expect class name.");
+  uint8_t nameConstant = identifierConstant(&parser.previous);
+  declareVariable();
+
+  emitBytes(OP_CLASS, nameConstant);
+  defineVariable(nameConstant);
+
+  consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+  consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
 }
 static void funDeclaration() {
   uint8_t global = parseVariable("Expect function name.");
@@ -767,7 +783,9 @@ static void synchronize() {
   }
 }
 static void declaration() {
-  if (match(TOKEN_FUN)) {
+  if (match(TOKEN_CLASS)) {
+    classDeclaration();
+  } else if (match(TOKEN_FUN)) {
     funDeclaration();
   } else if (match(TOKEN_VAR)) {
     varDeclaration();
@@ -814,4 +832,12 @@ ObjFunction* compile(const char* source) {
 
   ObjFunction* function = endCompiler();
   return parser.hadError ? NULL : function;
+}
+
+void markCompilerRoots() {
+  Compiler* compiler = current;
+  while (compiler != NULL) {
+    markObject((Obj*)compiler->function);
+    compiler = compiler->enclosing;
+  }
 }

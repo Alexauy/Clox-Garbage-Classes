@@ -39,6 +39,19 @@ static bool lenNative(int argCount, Value* args, Value* result){
   return true;
 }
 
+static bool hasFieldNative(int argCount, Value* args, Value* result) {
+  (void)argCount;
+  if (!IS_INSTANCE(args[0]) || !IS_STRING(args[1])) {
+    *result = FALSE_VAL;
+    return true;
+  }
+
+  ObjInstance* instance = AS_INSTANCE(args[0]);
+  Value dummy;
+  *result = BOOL_VAL(tableGet(&instance->fields, AS_STRING(args[1]), &dummy));
+  return true;
+}
+
 static void resetStack() {
   vm.stackTop = vm.stack;
   vm.frameCount = 0;
@@ -87,6 +100,7 @@ void initVM() {
   initTable(&vm.strings);
   defineNative("clock", 0, clockNative);
   defineNative("err", 0, errNative);
+  defineNative("hasField", 2, hasFieldNative);
   defineNative("len", 1, lenNative);
 }
 
@@ -319,6 +333,40 @@ static InterpretResult run() {
           runtimeError("Undefined variable '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
+        break;
+      }
+      case OP_GET_PROPERTY: {
+        if (!IS_INSTANCE(peek(0))) {
+          STORE_FRAME_IP();
+          runtimeError("Only instances have properties.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjInstance* instance = AS_INSTANCE(peek(0));
+        ObjString* name = READ_STRING();
+
+        Value value;
+        if (tableGet(&instance->fields, name, &value)) {
+          pop();
+          push(value);
+        } else {
+          pop();
+          push(NIL_VAL);
+        }
+        break;
+      }
+      case OP_SET_PROPERTY: {
+        if (!IS_INSTANCE(peek(1))) {
+          STORE_FRAME_IP();
+          runtimeError("Only instances have fields.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+
+        ObjInstance* instance = AS_INSTANCE(peek(1));
+        tableSet(&instance->fields, READ_STRING(), peek(0));
+        Value value = pop();
+        pop();
+        push(value);
         break;
       }
       case OP_EQUAL: {

@@ -3,6 +3,7 @@
 
 #include "common.h"
 #include "chunk.h"
+#include "table.h"
 #include "value.h"
 
 #define OBJ_TYPE(value)        (AS_OBJ(value)->type)
@@ -51,6 +52,7 @@ struct Obj {
 struct ObjClass {
   Obj obj;
   ObjString* name;
+  Table fields;
 };
 
 struct ObjFunction {
@@ -70,6 +72,7 @@ struct ObjNative {
 struct ObjInstance {
   Obj obj;
   ObjClass* klass;
+  Table fields;
 };
 
 struct ObjString {

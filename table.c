@@ -17,8 +17,24 @@ void freeTable(Table* table) {
   FREE_ARRAY(Entry, table->entries, table->capacity);
   initTable(table);
 }
-// NOTE: The "Optimization" chapter has a manual copy of this function.
-// If you change it here, make sure to update that copy.
+
+void markTable(Table* table){
+  for(int i = 0; i < table->capacity; i++) {
+    Entry* entry = &table->entries[i];
+    markObject((Obj*)entry->key);
+    markValue(entry->value);
+  }
+}
+
+void tableRemoveWhite(Table* table){
+  for(int i = 0; i < table->capacity; i++) {
+    Entry* entry = &table->entries[i];
+    if(entry->key != NULL && !entry->key->obj.isMarked) {
+      tableDelete(table, entry->key);
+    }
+  }
+}
+
 static Entry* findEntry(Entry* entries, int capacity,
                         ObjString* key) {
   uint32_t index = key->hash % capacity;
@@ -83,8 +99,19 @@ bool tableSet(Table* table, ObjString* key, Value value) {
   bool isNewKey = entry->key == NULL;
   if (isNewKey && IS_NIL(entry->value)) table->count++;
 
+  if(entry->key != NULL){
+    if(IS_OBJ(entry->value)){
+      releaseObject(AS_OBJ(entry->value));
+    }
+  }
+
   entry->key = key;
   entry->value = value;
+
+  if (IS_OBJ(value)) {
+  retainObject(AS_OBJ(value));
+  }
+
   return isNewKey;
 }
 bool tableDelete(Table* table, ObjString* key) {
@@ -93,6 +120,10 @@ bool tableDelete(Table* table, ObjString* key) {
   // Find the entry.
   Entry* entry = findEntry(table->entries, table->capacity, key);
   if (entry->key == NULL) return false;
+
+  if (IS_OBJ(entry->value)) {
+  releaseObject(AS_OBJ(entry->value));
+  }
 
   // Place a tombstone in the entry.
   entry->key = NULL;

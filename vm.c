@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <stdlib.h>
 
 #include "common.h"
 #include "compiler.h"
@@ -9,6 +10,7 @@
 #include "object.h"
 #include "memory.h"
 #include "vm.h"
+
 
 VM vm; // [one]
 static bool clockNative(int argCount, Value* args,
@@ -75,6 +77,11 @@ static void defineNative(const char* name, int arity,
 void initVM() {
   resetStack();
   vm.objects = NULL;
+  vm.grayCount = 0;
+  vm.grayCapacity = 0;
+  vm.grayStack = NULL;
+  vm.bytesAllocated = 0;
+  vm.nextGC = 1024 * 1024;
 
   initTable(&vm.globals);
   initTable(&vm.strings);
@@ -86,15 +93,27 @@ void initVM() {
 void freeVM() {
   freeTable(&vm.globals);
   freeTable(&vm.strings);
+  free(vm.grayStack);
   freeObjects();
 }
 void push(Value value) {
   *vm.stackTop = value;
+  if(IS_OBJ(value)){
+    retainObject(AS_OBJ(value));
+  }
+
   vm.stackTop++;
 }
 Value pop() {
   vm.stackTop--;
-  return *vm.stackTop;
+
+  Value value = *vm.stackTop;
+
+  if(IS_OBJ(value)){
+    releaseObject(AS_OBJ(value));
+  }
+
+  return value;
 }
 static Value peek(int distance) {
   return vm.stackTop[-1 - distance];
@@ -258,12 +277,14 @@ static InterpretResult run() {
       case OP_FALSE: push(BOOL_VAL(false)); break;
       case OP_POP: pop(); break;
       case OP_GET_LOCAL: {
-        uint16_t slot = READ_SHORT();
+        //uint16_t slot = READ_SHORT();
+        uint16_t slot = READ_BYTE();
         push(frame->slots[slot]); // [slot]
         break;
       }
       case OP_SET_LOCAL: {
-        uint16_t slot = READ_SHORT();
+        //uint16_t slot = READ_SHORT();
+        uint16_t slot = READ_BYTE();
         frame->slots[slot] = peek(0);
         break;
       }
@@ -342,7 +363,8 @@ static InterpretResult run() {
         push(NUMBER_VAL(-AS_NUMBER(pop())));
         break;
       case OP_PRINT: {
-        printValue(pop());
+        printValue(peek(0));
+        pop();
         printf("\n");
         break;
       }
@@ -373,21 +395,24 @@ static InterpretResult run() {
       }
       case OP_CLOSURE: {
         ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
-        ObjClosure* closure = NULL;
+        /*ObjClosure* closure = NULL;
         if (function->upvalueCount == 0) {
           push(OBJ_VAL(function));
         } else {
           closure = newClosure(function);
           push(OBJ_VAL(closure));
-        }
+        }*/
+
+        ObjClosure* closure = newClosure(function);
+        push(OBJ_VAL(closure));
 
         for (int i = 0; i < function->upvalueCount; i++) {
           uint8_t isLocal = READ_BYTE();
           uint16_t index = READ_SHORT();
-          if (closure != NULL && isLocal) {
+          if (isLocal) {
             closure->upvalues[i] =
                 captureUpvalue(frame->slots + index);
-          } else if (closure != NULL) {
+          } else {
             closure->upvalues[i] =
                 frame->closure->upvalues[index];
           }
@@ -435,14 +460,17 @@ InterpretResult interpret(const char* source) {
     return INTERPRET_COMPILE_ERROR;
   }
 
-  if (function->upvalueCount == 0) {
+  /*if (function->upvalueCount == 0) {
     push(OBJ_VAL(function));
     callFunction(function, NULL, 0);
   } else {
     ObjClosure* closure = newClosure(function);
     push(OBJ_VAL(closure));
     callClosure(closure, 0);
-  }
+  }*/
+  ObjClosure* closure = newClosure(function);
+  push(OBJ_VAL(closure));
+  callClosure(closure, 0);
 
   InterpretResult result = run();
   return result;

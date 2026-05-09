@@ -1,1 +1,18 @@
+fun test(){
+  var counter = 0;
 
+  fun increment(){
+    counter = counter + 1;
+    print counter;
+  }
+
+  return increment;
+}
+
+var c = test();
+
+for(var i = 0; i<3; i=i+1){
+  c();
+}
+
+print "we got through it yay!";

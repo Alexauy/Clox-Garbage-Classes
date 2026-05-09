@@ -36,6 +36,8 @@ typedef bool (*NativeFn)(int argCount, Value* args,
 
 struct Obj {
   ObjType type;
+  bool isMarked;
+  int refCount;
   struct Obj* next;
 };
 
@@ -81,6 +83,8 @@ ObjUpvalue* newUpvalue(Value* slot);
 ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);
 void printObject(Value value);
+void retainObject(Obj* obj);
+void releaseObject(Obj* obj);
 
 static inline bool isObjType(Value value, ObjType type) {
   return IS_OBJ(value) && AS_OBJ(value)->type == type;

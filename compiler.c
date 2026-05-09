@@ -440,8 +440,10 @@ static void namedVariable(Token name, bool canAssign) {
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
     if (isLocal) {
-      emitByte(setOp);
+      /*emitByte(setOp);
       emitShort((uint16_t)arg);
+      */
+      emitBytes(setOp, (uint8_t)arg);
     } else if (isUpvalue) {
       emitBytes(setOp, (uint8_t)arg);
     } else {
@@ -449,8 +451,10 @@ static void namedVariable(Token name, bool canAssign) {
     }
   } else {
     if (isLocal) {
-      emitByte(getOp);
+      /*emitByte(getOp);
       emitShort((uint16_t)arg);
+      */
+      emitBytes(getOp, (uint8_t)arg);
     } else if (isUpvalue) {
       emitBytes(getOp, (uint8_t)arg);
     } else {

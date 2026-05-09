@@ -7,12 +7,26 @@
 #include "value.h"
 #include "vm.h"
 
+void freeObject(Obj* obj);
+
 #define ALLOCATE_OBJ(type, objectType) \
     (type*)allocateObject(sizeof(type), objectType)
+
+void retainObject(Obj* obj){
+  if(obj == NULL) return;
+  obj->refCount++;
+}
+
+void releaseObject(Obj* obj){
+  if(obj == NULL) return;
+  obj->refCount--;
+}
 
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, 0, size);
   object->type = type;
+  object->isMarked = false;
+  object->refCount = 0;
 
   object->next = vm.objects;
   vm.objects = object;

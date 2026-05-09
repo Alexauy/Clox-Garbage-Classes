@@ -102,6 +102,7 @@ void initVM() {
   defineNative("err", 0, errNative);
   defineNative("hasField", 2, hasFieldNative);
   defineNative("len", 1, lenNative);
+  defineNative("hasField", 2, hasFieldNative);
 }
 
 void freeVM() {
